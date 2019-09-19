@@ -50,6 +50,9 @@ class Stdio extends EventEmitter implements DuplexStreamInterface
             $that->emit('data', array($line));
         });
 
+        $this->readline->on('mouse', function($event) use ($that) {
+            $that->emit('mouse', [$event]);
+        });
         // handle all input events (readline forwards all input events)
         $this->readline->on('error', array($this, 'handleError'));
         $this->readline->on('end', array($this, 'handleEnd'));
@@ -58,6 +61,9 @@ class Stdio extends EventEmitter implements DuplexStreamInterface
         // handle all output events
         $this->output->on('error', array($this, 'handleError'));
         $this->output->on('close', array($this, 'handleCloseOutput'));
+
+        $this->write("\033[?1000h"); // enable mouse tracking
+        //$this->write('')
     }
 
     public function __destruct()
@@ -185,6 +191,9 @@ class Stdio extends EventEmitter implements DuplexStreamInterface
 
     public function close()
     {
+        $this->write("\033[?25h"); // enable cursor
+        $this->write("\033[?1000l"); // disable mouse tracking
+
         if ($this->closed) {
             return;
         }
@@ -194,11 +203,19 @@ class Stdio extends EventEmitter implements DuplexStreamInterface
 
         $this->input->close();
         $this->output->close();
-
+       
         $this->emit('close');
         $this->removeAllListeners();
     }
 
+    public function hideCursor(){
+        $this->write("\033[?25l");
+    }
+
+    public function showCursor(){
+        $this->write("\033[?25h");
+        return $this;
+    }
     /**
      * @deprecated
      * @return Readline
