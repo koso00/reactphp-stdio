@@ -36,9 +36,11 @@ class Readline extends EventEmitter implements ReadableStreamInterface
 
     private $autocomplete = null;
     private $autocompleteSuggestions = 8;
+    private $mouseEvent = false;
 
     public function __construct(ReadableStreamInterface $input, WritableStreamInterface $output, EventEmitterInterface $base = null)
     {
+
         $this->input = $input;
         $this->output = $output;
 
@@ -55,7 +57,7 @@ class Readline extends EventEmitter implements ReadableStreamInterface
             "\x7f" => 'onKeyBackspace', // ^?
             "\t"   => 'onKeyTab', // ^I
             "\x04" => 'handleEnd', // ^D
-
+            "\033[M" => 'onMouse',
             "\033[A" => 'onKeyUp',
             "\033[B" => 'onKeyDown',
             "\033[C" => 'onKeyRight',
@@ -65,10 +67,12 @@ class Readline extends EventEmitter implements ReadableStreamInterface
 //          "\033[2~" => 'onKeyInsert',
             "\033[3~" => 'onKeyDelete',
             "\033[4~" => 'onKeyEnd',
-
 //          "\033[20~" => 'onKeyF10',
         );
+
         $decode = function ($code) use ($codes, $that, $base) {
+            
+            //echo $code;
             // The user confirms input with enter key which should usually
             // generate a NL (`\n`) character. Common terminals also seem to
             // accept a CR (`\r`) character in place and handle this just like a
@@ -113,6 +117,40 @@ class Readline extends EventEmitter implements ReadableStreamInterface
         $utf8->on('close', array($this, 'close'));
     }
 
+    
+    private function onMouse($code){
+        $this->mouseEvent = true;
+    }
+
+    private function dispatchMouseEvent($chars){
+        $this->mouseEvent = false;
+        if ($chars[0] == "#"){
+            return;
+        }
+        $event = array(
+            "type" => $chars[0],
+            "x" => ord($chars[1]) - 33,
+            "y" => ord($chars[2]) - 33,
+        );
+        switch ($chars[0]) {
+            case ' ':
+                $event["type"] = 'left_click';
+                break;
+            case '"':
+                $event["type"] = 'right_click';
+                break;
+            case '!':
+                $event["type"] = 'wheel_click';
+                break;
+            case '`':
+                $event["type"] = 'wheel_up';
+                break;
+            case 'a':
+                $event["type"] = 'wheel_down';
+                break;
+        }
+        $this->emit('mouse',[$event]);
+    }
     /**
      * prompt to prepend to input line
      *
@@ -782,6 +820,10 @@ class Readline extends EventEmitter implements ReadableStreamInterface
      */
     public function onFallback($chars, EventEmitterInterface $base = null)
     {
+        if ($this->mouseEvent){
+            $this->dispatchMouseEvent($chars);
+            return;
+        }
         // check if there's any special key binding for any of the chars
         $buffer = '';
         foreach ($this->strsplit($chars) as $char) {
