@@ -67,6 +67,8 @@ class Readline extends EventEmitter implements ReadableStreamInterface
 //          "\033[2~" => 'onKeyInsert',
             "\033[3~" => 'onKeyDelete',
             "\033[4~" => 'onKeyEnd',
+            "\033[I" => 'onFocus',
+            "\033[O" => 'onBlur'
 //          "\033[20~" => 'onKeyF10',
         );
 
@@ -117,6 +119,12 @@ class Readline extends EventEmitter implements ReadableStreamInterface
         $utf8->on('close', array($this, 'close'));
     }
 
+    private function onFocus(){
+        $this->emit("focus");
+    }
+    private function onBlur(){
+        $this->emit("blur");
+    }
     
     private function onMouse($code){
         $this->mouseEvent = true;
