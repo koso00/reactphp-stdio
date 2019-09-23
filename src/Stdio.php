@@ -21,6 +21,7 @@ class Stdio extends EventEmitter implements DuplexStreamInterface
     private $closed = false;
     private $incompleteLine = '';
     private $originalTtyMode = null;
+    private $focusState = true;
 
     public function __construct(LoopInterface $loop, ReadableStreamInterface $input = null, WritableStreamInterface $output = null, Readline $readline = null)
     {
@@ -50,6 +51,16 @@ class Stdio extends EventEmitter implements DuplexStreamInterface
             $that->emit('data', array($line));
         });
 
+        $this->readline->on('focus',function() use ($that){
+            $that->emit("focus");
+            $that->setFocus();
+        });
+
+        $this->readline->on('blur',function() use ($that){
+            $that->emit("blur");
+            $that->setBlur();
+        });
+
         $this->readline->on('mouse', function($event) use ($that) {
             $that->emit('mouse', [$event]);
         });
@@ -63,6 +74,7 @@ class Stdio extends EventEmitter implements DuplexStreamInterface
         $this->output->on('close', array($this, 'handleCloseOutput'));
 
         $this->write("\033[?1000h"); // enable mouse tracking
+        $this->write("\033[?1004h"); // enable focus tracking
         //$this->write('')
     }
 
@@ -71,6 +83,17 @@ class Stdio extends EventEmitter implements DuplexStreamInterface
         $this->restoreTtyMode();
     }
 
+    private function setFocus(){
+        $this->focusState = true;
+    }
+    
+    private function setBlur(){
+        $this->focusState = false;
+    }
+
+    public function isFocused(){
+        return $this->focusState;
+    }
     public function pause()
     {
         $this->input->pause();
@@ -193,6 +216,7 @@ class Stdio extends EventEmitter implements DuplexStreamInterface
     {
         $this->write("\033[?25h"); // enable cursor
         $this->write("\033[?1000l"); // disable mouse tracking
+        $this->write("\033[?1004l"); // disable focus tracking
 
         if ($this->closed) {
             return;
